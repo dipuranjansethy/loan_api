@@ -1,20 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRole } from '../models/User';
-import User from '../models/User';
+import User from '../models/User'; // Adjust path as needed
+import cookieParser from 'cookie-parser'; // Import cookie-parser
 import config from '../config/config';
 
+// Interface for JWT payload
 interface JwtPayload {
   id: string;
-  role: UserRole;
+  role: string;
 }
 
+// Extend the Express Request type to include our custom properties
 declare global {
   namespace Express {
     interface Request {
       user?: any;
       userId?: string;
-      userRole?: UserRole;
+      userRole?: string;
     }
   }
 }
@@ -23,40 +25,33 @@ export const protect = async (
   req: Request,
   res: Response,
   next: NextFunction
-)=> {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(' ')[1];
-
-      // Verify token
-      const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
-
-      // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
-      req.userId = decoded.id;
-      req.userRole = decoded.role;
-
-      next();
-    } catch (error) {
-      res.status(401).json({
+) => {
+  try {
+    // Get token from cookies (cookie-parser middleware makes this simple)
+    const token = req.cookies.jwt;
+    
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        message: 'Not authorized, token failed'
+        message: 'Not authorized, jwt cookie not found'
       });
-      return;
     }
-  }
-
-  if (!token) {
-    res.status(401).json({
+    
+    // Verify token
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    console.log("decoded:", decoded);
+    
+    // Get user from the token
+    req.user = await User.findById(decoded.id).select('-password');
+    req.userId = decoded.id;
+    req.userRole = decoded.role;
+    
+    next();
+  } catch (error) {
+    console.error("Token verification error:", error);
+    return res.status(401).json({
       success: false,
-      message: 'Not authorized, no token'
+      message: 'Not authorized, token failed'
     });
-    return;
   }
 };

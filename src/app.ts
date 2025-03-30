@@ -6,10 +6,14 @@ import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import loanRoutes from './routes/loanRoutes';
 import config from './config/config';
+import cookieParser from 'cookie-parser';
+
+// Add this before your routes
 
 const app = express();
 
 // Middleware
+app.use(cookieParser());
 app.use(express.json());
 app.use(cors({
   origin: '*', 

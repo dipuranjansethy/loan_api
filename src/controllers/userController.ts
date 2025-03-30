@@ -3,9 +3,6 @@ import User, { UserRole, IUser } from '../models/User';
 import { validationResult } from 'express-validator';
 import mongoose, { Document } from 'mongoose';
 
-// @desc    Get all users
-// @route   GET /api/users
-// @access  Private/Admin
 export const getUsers = async (req: Request, res: Response)  => {
   try {
     const users = await User.find().select('-password');
