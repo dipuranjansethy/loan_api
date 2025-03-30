@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import User, { UserRole, IUser } from '../models/User';
+import config from '../config/config';
 
 
 export const register = async (req: Request, res: Response) => {
@@ -56,7 +57,7 @@ export const register = async (req: Request, res: Response) => {
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
-export const login = async (req: Request, res: Response)  => {
+export const login = async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
@@ -88,6 +89,17 @@ export const login = async (req: Request, res: Response)  => {
       return;
     }
 
+    // Generate token
+    const token = user.generateAuthToken();
+
+    // Set cookie
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -95,10 +107,11 @@ export const login = async (req: Request, res: Response)  => {
         name: user.name,
         email: user.email,
         role: user.role,
-        token: user.generateAuthToken()
+        token // Include token in response for client-side storage if needed
       }
     });
   } catch (error) {
+    console.error('Login Error:', error);
     res.status(500).json({
       success: false,
       message: 'Server Error',

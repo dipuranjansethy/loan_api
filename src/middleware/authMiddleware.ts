@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User'; // Adjust path as needed
-import cookieParser from 'cookie-parser'; // Import cookie-parser
 import config from '../config/config';
 
 // Interface for JWT payload
@@ -27,31 +26,54 @@ export const protect = async (
   next: NextFunction
 ) => {
   try {
-    // Get token from cookies (cookie-parser middleware makes this simple)
-    const token = req.cookies.jwt;
+    let token;
+    
+    // Check for token in both cookie and Authorization header
+    if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+      console.log(token);
+    } else if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
     
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Not authorized, jwt cookie not found'
+        message: 'Not authorized, no token'
       });
     }
-    
-    // Verify token
-    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
-    console.log("decoded:", decoded);
-    
-    // Get user from the token
-    req.user = await User.findById(decoded.id).select('-password');
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
-    
-    next();
+
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+      console.log(decoded);
+      // Get user from the token
+      const user = await User.findById(decoded.id).select('-password');
+      
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      req.user = user;
+      req.userId = decoded.id;
+      req.userRole = decoded.role;
+      
+      next();
+    } catch (jwtError) {
+      console.error('JWT Verification Error:', jwtError);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
   } catch (error) {
-    console.error("Token verification error:", error);
-    return res.status(401).json({
+    console.error('Auth Middleware Error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Not authorized, token failed'
+      message: 'Server error in auth middleware'
     });
   }
 };
